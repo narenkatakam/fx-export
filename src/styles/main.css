@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  overflow: hidden;
+  background: #0a0a0a;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+}
+
+#canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+}
+
+.attribution {
+  position: fixed;
+  bottom: 8px;
+  right: 12px;
+  font: 10px/1 'Inter', -apple-system, system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  opacity: 0.3;
+  color: #e0e0e0;
+  z-index: 5;
+  pointer-events: none;
+  user-select: none;
+  transition: color 0.3s ease;
+}
+
+body.light-bg .attribution {
+  color: #1a1a1a;
+}
