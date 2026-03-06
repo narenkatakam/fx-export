@@ -30,6 +30,7 @@ export const fluidEffect: EffectDef = {
     { key: 'u_fresnelStrength', label: 'Fresnel', type: 'slider', group: 'Effects', min: 0, max: 1, step: 0.01, default: 0.7 },
     { key: 'u_envIntensity', label: 'Env Light', type: 'slider', group: 'Effects', min: 0, max: 1.5, step: 0.01, default: 0.6 },
     { key: 'u_parallax', label: 'Parallax', type: 'slider', group: 'Effects', min: 0, max: 1, step: 0.01, default: 0.5 },
+    { key: 'bloom', label: 'Bloom', type: 'slider', group: 'Effects', min: 0, max: 1, step: 0.01, default: 0.3 },
   ],
   presets: [
     {

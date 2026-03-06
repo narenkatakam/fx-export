@@ -130,6 +130,12 @@
   color: #e0e0e0;
 }
 
+.preset-select optgroup {
+  background: #1a1a1a;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: normal;
+}
+
 /* Slider row */
 .slider-row {
   display: grid;

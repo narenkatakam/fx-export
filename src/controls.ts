@@ -1,187 +1,43 @@
-import type { EffectConfig } from './config'
-import { rgbToHex, hexToRgb } from './config'
-import { presets } from './presets'
+import type { EffectDef, ParamDef, Preset } from './registry'
 
-type OnChange = <K extends keyof EffectConfig>(key: K, value: EffectConfig[K]) => void
+type Value = number | [number, number, number]
+type Values = Record<string, Value>
 
-interface SliderDef {
-  key: keyof EffectConfig
-  label: string
-  min: number
-  max: number
-  step: number
+interface PanelCallbacks {
+  onEffectChange: (effectId: string) => void
+  onParamChange: (key: string, value: Value) => void
+  onExport: () => void
 }
 
-interface ColorDef {
-  key: 'colorA' | 'colorB' | 'colorC' | 'bgColor'
-  label: string
+interface PanelController {
+  element: HTMLElement
+  switchEffect: (effect: EffectDef) => void
 }
 
-const materialSliders: SliderDef[] = [
-  { key: 'metallic', label: 'Metallic', min: 0, max: 1, step: 0.01 },
-  { key: 'roughness', label: 'Roughness', min: 0, max: 1, step: 0.01 },
-  { key: 'glossiness', label: 'Glossiness', min: 5, max: 100, step: 1 },
-]
+// --- Color utilities ---
 
-const motionSliders: SliderDef[] = [
-  { key: 'speed', label: 'Speed', min: 0, max: 2, step: 0.05 },
-  { key: 'complexity', label: 'Complexity', min: 0.5, max: 4, step: 0.1 },
-  { key: 'warpIntensity', label: 'Warp', min: 0, max: 3, step: 0.05 },
-]
+export function hexToRgb(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  return [r, g, b]
+}
 
-const shapeSliders: SliderDef[] = [
-  { key: 'zoom', label: 'Zoom', min: 0.5, max: 5, step: 0.1 },
-  { key: 'elevation', label: 'Elevation', min: 0, max: 3, step: 0.05 },
-]
+export function rgbToHex(rgb: [number, number, number]): string {
+  const r = Math.round(rgb[0] * 255).toString(16).padStart(2, '0')
+  const g = Math.round(rgb[1] * 255).toString(16).padStart(2, '0')
+  const b = Math.round(rgb[2] * 255).toString(16).padStart(2, '0')
+  return `#${r}${g}${b}`
+}
 
-const effectSliders: SliderDef[] = [
-  { key: 'bloom', label: 'Bloom', min: 0, max: 1, step: 0.01 },
-  { key: 'parallax', label: 'Parallax', min: 0, max: 1, step: 0.01 },
-  { key: 'fresnelStrength', label: 'Fresnel', min: 0, max: 1, step: 0.01 },
-  { key: 'envIntensity', label: 'Env Light', min: 0, max: 1.5, step: 0.01 },
-]
+export function getBrightness(rgb: [number, number, number]): number {
+  return (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000
+}
 
-const colorDefs: ColorDef[] = [
-  { key: 'colorA', label: 'Primary' },
-  { key: 'colorB', label: 'Secondary' },
-  { key: 'colorC', label: 'Depth' },
-  { key: 'bgColor', label: 'Background' },
-]
-
-export function createPanel(
-  config: EffectConfig,
-  onChange: OnChange,
-  onExport: () => void,
-): HTMLElement {
-  const panel = document.createElement('div')
-  panel.className = 'panel'
-
-  const inputs: Map<string, HTMLInputElement> = new Map()
-  const valueLabels: Map<string, HTMLSpanElement> = new Map()
-
-  // Header
-  const header = document.createElement('div')
-  header.className = 'panel-header'
-
-  const title = document.createElement('span')
-  title.className = 'panel-title'
-  title.textContent = 'FLUID EFFECTS'
-  header.appendChild(title)
-
-  const toggleBtn = document.createElement('button')
-  toggleBtn.className = 'panel-toggle'
-  toggleBtn.title = 'Toggle panel (H)'
-  toggleBtn.textContent = '\u2014'
-  header.appendChild(toggleBtn)
-
-  panel.appendChild(header)
-
-  const body = document.createElement('div')
-  body.className = 'panel-body'
-
-  // Toggle collapse
-  toggleBtn.addEventListener('click', () => {
-    panel.classList.toggle('collapsed')
-    toggleBtn.textContent = panel.classList.contains('collapsed') ? '+' : '\u2014'
-  })
-
-  // Preset selector
-  const presetSection = createSection('Preset')
-  const select = document.createElement('select')
-  select.className = 'preset-select'
-  presets.forEach((p, i) => {
-    const opt = document.createElement('option')
-    opt.value = String(i)
-    opt.textContent = p.name
-    select.appendChild(opt)
-  })
-  select.addEventListener('change', () => {
-    const preset = presets[parseInt(select.value)]
-    Object.assign(config, structuredClone(preset.config))
-    updateAllInputs()
-    for (const key of Object.keys(preset.config) as (keyof EffectConfig)[]) {
-      onChange(key, config[key] as any)
-    }
-  })
-  presetSection.appendChild(select)
-  body.appendChild(presetSection)
-
-  // Colors
-  const colorSection = createSection('Colors')
-  for (const def of colorDefs) {
-    const row = createColorPicker(def.label, config[def.key], (val) => {
-      onChange(def.key, val)
-    })
-    colorSection.appendChild(row)
-    inputs.set(def.key, row.querySelector('input[type="color"]')!)
-  }
-  body.appendChild(colorSection)
-
-  // Material
-  body.appendChild(createSliderSection('Material', materialSliders, config, onChange, inputs, valueLabels))
-
-  // Motion
-  body.appendChild(createSliderSection('Motion', motionSliders, config, onChange, inputs, valueLabels))
-
-  // Shape
-  body.appendChild(createSliderSection('Shape', shapeSliders, config, onChange, inputs, valueLabels))
-
-  // Effects
-  body.appendChild(createSliderSection('Effects', effectSliders, config, onChange, inputs, valueLabels))
-
-  // Actions
-  const actions = createSection('')
-  actions.className = 'panel-actions'
-
-  const exportBtn = document.createElement('button')
-  exportBtn.className = 'btn-export'
-  exportBtn.textContent = '\u2193 Export HTML'
-  exportBtn.addEventListener('click', onExport)
-  actions.appendChild(exportBtn)
-
-  const resetBtn = document.createElement('button')
-  resetBtn.className = 'btn-reset'
-  resetBtn.textContent = '\u21BB Reset'
-  resetBtn.addEventListener('click', () => {
-    select.value = '0'
-    const preset = presets[0]
-    Object.assign(config, structuredClone(preset.config))
-    updateAllInputs()
-    for (const key of Object.keys(preset.config) as (keyof EffectConfig)[]) {
-      onChange(key, config[key] as any)
-    }
-  })
-  actions.appendChild(resetBtn)
-
-  body.appendChild(actions)
-  panel.appendChild(body)
-
-  function updateAllInputs() {
-    for (const def of colorDefs) {
-      const input = inputs.get(def.key)
-      if (input) input.value = rgbToHex(config[def.key])
-      const hexLabel = input?.parentElement?.querySelector('.hex-value') as HTMLSpanElement | null
-      if (hexLabel) hexLabel.textContent = rgbToHex(config[def.key])
-    }
-    const allSliders = [...materialSliders, ...motionSliders, ...shapeSliders, ...effectSliders]
-    for (const s of allSliders) {
-      const input = inputs.get(s.key)
-      if (input) input.value = String(config[s.key])
-      const label = valueLabels.get(s.key)
-      if (label) label.textContent = formatValue(config[s.key] as number, s.step)
-    }
-  }
-
-  // Keyboard shortcut
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'h' || e.key === 'H') {
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return
-      panel.classList.toggle('collapsed')
-      toggleBtn.textContent = panel.classList.contains('collapsed') ? '+' : '\u2014'
-    }
-  })
-
-  return panel
+function formatValue(v: number, step: number): string {
+  if (step >= 1) return String(Math.round(v))
+  if (step >= 0.1) return v.toFixed(1)
+  return v.toFixed(2)
 }
 
 function createSection(title: string): HTMLDivElement {
@@ -196,88 +52,284 @@ function createSection(title: string): HTMLDivElement {
   return section
 }
 
-function createSliderSection(
-  title: string,
-  defs: SliderDef[],
-  config: EffectConfig,
-  onChange: OnChange,
-  inputs: Map<string, HTMLInputElement>,
-  valueLabels: Map<string, HTMLSpanElement>,
-): HTMLDivElement {
-  const section = createSection(title)
-  for (const def of defs) {
-    const row = document.createElement('div')
-    row.className = 'slider-row'
+// --- Panel ---
 
-    const label = document.createElement('label')
-    label.textContent = def.label
+export function createPanel(
+  effects: EffectDef[],
+  initialEffect: EffectDef,
+  values: Values,
+  callbacks: PanelCallbacks,
+): PanelController {
+  const panel = document.createElement('div')
+  panel.className = 'panel'
 
-    const value = document.createElement('span')
-    value.className = 'slider-value'
-    value.textContent = formatValue(config[def.key] as number, def.step)
-    valueLabels.set(def.key, value)
+  let activeEffect = initialEffect
+  const inputs = new Map<string, HTMLInputElement>()
+  const valueLabels = new Map<string, HTMLSpanElement>()
 
-    const input = document.createElement('input')
-    input.type = 'range'
-    input.min = String(def.min)
-    input.max = String(def.max)
-    input.step = String(def.step)
-    input.value = String(config[def.key])
-    inputs.set(def.key, input)
+  // --- Header ---
+  const header = document.createElement('div')
+  header.className = 'panel-header'
 
-    input.addEventListener('input', () => {
-      const v = parseFloat(input.value)
-      value.textContent = formatValue(v, def.step)
-      onChange(def.key, v as any)
-    })
+  const title = document.createElement('span')
+  title.className = 'panel-title'
+  title.textContent = 'FX EXPORT'
+  header.appendChild(title)
 
-    row.appendChild(label)
-    row.appendChild(value)
-    row.appendChild(input)
-    section.appendChild(row)
+  const toggleBtn = document.createElement('button')
+  toggleBtn.className = 'panel-toggle'
+  toggleBtn.title = 'Toggle panel (H)'
+  toggleBtn.textContent = '\u2014'
+  toggleBtn.addEventListener('click', () => {
+    panel.classList.toggle('collapsed')
+    toggleBtn.textContent = panel.classList.contains('collapsed') ? '+' : '\u2014'
+  })
+  header.appendChild(toggleBtn)
+  panel.appendChild(header)
+
+  // --- Body ---
+  const body = document.createElement('div')
+  body.className = 'panel-body'
+
+  // Effect selector
+  const effectSection = createSection('Effect')
+  const effectSelect = document.createElement('select')
+  effectSelect.className = 'preset-select'
+  for (const e of effects) {
+    const opt = document.createElement('option')
+    opt.value = e.id
+    opt.textContent = e.name
+    if (e.id === initialEffect.id) opt.selected = true
+    effectSelect.appendChild(opt)
   }
-  return section
-}
+  effectSelect.addEventListener('change', () => callbacks.onEffectChange(effectSelect.value))
+  effectSection.appendChild(effectSelect)
+  body.appendChild(effectSection)
 
-function createColorPicker(
-  label: string,
-  value: [number, number, number],
-  onChange: (val: [number, number, number]) => void,
-): HTMLDivElement {
-  const row = document.createElement('div')
-  row.className = 'color-row'
+  // Preset selector
+  const presetSection = document.createElement('div')
+  presetSection.className = 'panel-section'
+  const presetSelect = document.createElement('select')
+  presetSelect.className = 'preset-select'
+  presetSelect.addEventListener('change', () => {
+    const idx = parseInt(presetSelect.value)
+    const preset = activeEffect.presets[idx]
+    if (preset) applyPreset(preset)
+  })
+  body.appendChild(presetSection)
 
-  const lbl = document.createElement('label')
-  lbl.textContent = label
+  // Params container (rebuilt on effect switch)
+  const paramsContainer = document.createElement('div')
+  body.appendChild(paramsContainer)
 
-  const input = document.createElement('input')
-  input.type = 'color'
-  input.value = rgbToHex(value)
+  // Actions
+  const actions = document.createElement('div')
+  actions.className = 'panel-actions'
 
-  const hex = document.createElement('span')
-  hex.className = 'hex-value'
-  hex.textContent = rgbToHex(value)
+  const exportBtn = document.createElement('button')
+  exportBtn.className = 'btn-export'
+  exportBtn.textContent = '\u2193 Export HTML'
+  exportBtn.addEventListener('click', callbacks.onExport)
+  actions.appendChild(exportBtn)
 
-  input.addEventListener('input', () => {
-    const rgb = hexToRgb(input.value)
-    hex.textContent = input.value
-    onChange(rgb)
+  const resetBtn = document.createElement('button')
+  resetBtn.className = 'btn-reset'
+  resetBtn.textContent = '\u21BB Reset'
+  resetBtn.addEventListener('click', () => {
+    const preset = activeEffect.presets.find(p => p.recommended) || activeEffect.presets[0]
+    if (preset) {
+      presetSelect.value = String(activeEffect.presets.indexOf(preset))
+      applyPreset(preset)
+    }
+  })
+  actions.appendChild(resetBtn)
+
+  body.appendChild(actions)
+  panel.appendChild(body)
+
+  // --- Preset dropdown ---
+  function buildPresetDropdown(effect: EffectDef) {
+    presetSection.replaceChildren()
+
+    const sectionTitle = document.createElement('div')
+    sectionTitle.className = 'section-title'
+    sectionTitle.textContent = 'Preset'
+    presetSection.appendChild(sectionTitle)
+
+    presetSelect.replaceChildren()
+    const recommended = effect.presets.filter(p => p.recommended)
+    const others = effect.presets.filter(p => !p.recommended)
+
+    if (recommended.length > 0) {
+      const group = document.createElement('optgroup')
+      group.label = 'Recommended'
+      for (const p of recommended) {
+        const opt = document.createElement('option')
+        opt.value = String(effect.presets.indexOf(p))
+        opt.textContent = p.name
+        group.appendChild(opt)
+      }
+      presetSelect.appendChild(group)
+    }
+
+    if (others.length > 0) {
+      const group = document.createElement('optgroup')
+      group.label = 'All Presets'
+      for (const p of others) {
+        const opt = document.createElement('option')
+        opt.value = String(effect.presets.indexOf(p))
+        opt.textContent = p.name
+        group.appendChild(opt)
+      }
+      presetSelect.appendChild(group)
+    }
+
+    presetSection.appendChild(presetSelect)
+  }
+
+  function applyPreset(preset: Preset) {
+    for (const [key, val] of Object.entries(preset.values)) {
+      values[key] = Array.isArray(val) ? ([...val] as [number, number, number]) : val
+    }
+    updateAllInputs()
+    for (const key of Object.keys(preset.values)) {
+      callbacks.onParamChange(key, values[key])
+    }
+  }
+
+  // --- Param sections ---
+  function buildParams(effect: EffectDef) {
+    paramsContainer.replaceChildren()
+    inputs.clear()
+    valueLabels.clear()
+
+    // Group params preserving order
+    const groups = new Map<string, ParamDef[]>()
+    for (const p of effect.params) {
+      if (!groups.has(p.group)) groups.set(p.group, [])
+      groups.get(p.group)!.push(p)
+    }
+
+    for (const [groupName, params] of groups) {
+      const section = createSection(groupName)
+
+      for (const p of params) {
+        if (p.type === 'color') {
+          const val = (values[p.key] ?? p.default) as [number, number, number]
+          const row = document.createElement('div')
+          row.className = 'color-row'
+
+          const lbl = document.createElement('label')
+          lbl.textContent = p.label
+
+          const input = document.createElement('input')
+          input.type = 'color'
+          input.value = rgbToHex(val)
+          inputs.set(p.key, input)
+
+          const hex = document.createElement('span')
+          hex.className = 'hex-value'
+          hex.textContent = rgbToHex(val)
+
+          input.addEventListener('input', () => {
+            const rgb = hexToRgb(input.value)
+            hex.textContent = input.value
+            values[p.key] = rgb
+            callbacks.onParamChange(p.key, rgb)
+          })
+
+          row.appendChild(lbl)
+          row.appendChild(input)
+          row.appendChild(hex)
+          section.appendChild(row)
+        } else {
+          const val = (values[p.key] ?? p.default) as number
+          const row = document.createElement('div')
+          row.className = 'slider-row'
+
+          const label = document.createElement('label')
+          label.textContent = p.label
+
+          const valueSpan = document.createElement('span')
+          valueSpan.className = 'slider-value'
+          valueSpan.textContent = formatValue(val, p.step!)
+          valueLabels.set(p.key, valueSpan)
+
+          const input = document.createElement('input')
+          input.type = 'range'
+          input.min = String(p.min)
+          input.max = String(p.max)
+          input.step = String(p.step)
+          input.value = String(val)
+          inputs.set(p.key, input)
+
+          input.addEventListener('input', () => {
+            const v = parseFloat(input.value)
+            valueSpan.textContent = formatValue(v, p.step!)
+            values[p.key] = v
+            callbacks.onParamChange(p.key, v)
+          })
+
+          row.appendChild(label)
+          row.appendChild(valueSpan)
+          row.appendChild(input)
+          section.appendChild(row)
+        }
+      }
+
+      paramsContainer.appendChild(section)
+    }
+  }
+
+  function updateAllInputs() {
+    for (const p of activeEffect.params) {
+      const input = inputs.get(p.key)
+      if (!input) continue
+      const val = values[p.key] ?? p.default
+
+      if (p.type === 'color') {
+        const rgb = val as [number, number, number]
+        input.value = rgbToHex(rgb)
+        const hexLabel = input.parentElement?.querySelector('.hex-value') as HTMLSpanElement | null
+        if (hexLabel) hexLabel.textContent = rgbToHex(rgb)
+      } else {
+        input.value = String(val)
+        const label = valueLabels.get(p.key)
+        if (label) label.textContent = formatValue(val as number, p.step!)
+      }
+    }
+  }
+
+  // Keyboard shortcut
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'h' || e.key === 'H') {
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return
+      panel.classList.toggle('collapsed')
+      toggleBtn.textContent = panel.classList.contains('collapsed') ? '+' : '\u2014'
+    }
   })
 
-  row.appendChild(lbl)
-  row.appendChild(input)
-  row.appendChild(hex)
-  return row
+  // Initial build
+  buildPresetDropdown(initialEffect)
+  buildParams(initialEffect)
+
+  return {
+    element: panel,
+    switchEffect(effect: EffectDef) {
+      activeEffect = effect
+      effectSelect.value = effect.id
+      buildPresetDropdown(effect)
+      buildParams(effect)
+    },
+  }
 }
 
-function formatValue(v: number, step: number): string {
-  if (step >= 1) return String(Math.round(v))
-  if (step >= 0.1) return v.toFixed(1)
-  return v.toFixed(2)
-}
+// --- Export Modal ---
 
-// Export modal
-export function showExportModal(onDownload: (w: number, h: number, animated: boolean) => void, onCopy: (w: number, h: number, animated: boolean) => void) {
+export function showExportModal(
+  onDownload: (w: number, h: number, animated: boolean) => void,
+  onCopy: (w: number, h: number, animated: boolean) => void,
+) {
   const overlay = document.createElement('div')
   overlay.className = 'export-modal-overlay'
 
@@ -292,7 +344,6 @@ export function showExportModal(onDownload: (w: number, h: number, animated: boo
   desc.textContent = 'Your effect is ready. This file has zero dependencies \u2014 drop it into any website.'
   modal.appendChild(desc)
 
-  // Canvas size
   const sizeField = document.createElement('div')
   sizeField.className = 'export-field'
 
@@ -320,7 +371,6 @@ export function showExportModal(onDownload: (w: number, h: number, animated: boo
 
   modal.appendChild(sizeField)
 
-  // Animated checkbox
   const checkRow = document.createElement('div')
   checkRow.className = 'export-checkbox'
 
@@ -337,9 +387,8 @@ export function showExportModal(onDownload: (w: number, h: number, animated: boo
   checkRow.appendChild(checkLabel)
   modal.appendChild(checkRow)
 
-  // Action buttons
-  const actions = document.createElement('div')
-  actions.className = 'export-actions'
+  const actionsDiv = document.createElement('div')
+  actionsDiv.className = 'export-actions'
 
   const downloadBtn = document.createElement('button')
   downloadBtn.className = 'btn-download'
@@ -365,18 +414,16 @@ export function showExportModal(onDownload: (w: number, h: number, animated: boo
     }, 1500)
   })
 
-  actions.appendChild(downloadBtn)
-  actions.appendChild(copyBtn)
-  modal.appendChild(actions)
+  actionsDiv.appendChild(downloadBtn)
+  actionsDiv.appendChild(copyBtn)
+  modal.appendChild(actionsDiv)
 
   overlay.appendChild(modal)
 
-  // Close on overlay click
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) overlay.remove()
   })
 
-  // Close on Escape
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       overlay.remove()
