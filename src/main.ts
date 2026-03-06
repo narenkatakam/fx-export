@@ -7,18 +7,16 @@ import { generateExportHTML, downloadHTML, copyToClipboard } from './export'
 import { fluidEffect } from './effects/fluid'
 import { gradientEffect } from './effects/gradient'
 import { wavesEffect } from './effects/waves'
-import { particlesEffect } from './effects/particles'
 import { voronoiEffect } from './effects/voronoi'
 
 registerEffect(fluidEffect)
 registerEffect(gradientEffect)
 registerEffect(wavesEffect)
-registerEffect(particlesEffect)
 registerEffect(voronoiEffect)
 
 // State
 const effects = getAllEffects()
-let currentEffect = effects[0]
+let currentEffect = effects.find(e => e.id === 'gradient') || effects[0]
 const values: Record<string, number | [number, number, number]> = {}
 
 function loadPresetValues(effect: typeof currentEffect) {
