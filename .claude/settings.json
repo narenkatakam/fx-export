@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat /Users/narenkatakam/personal-ventures/experiments/fx-export/.github/workflows/*.yml)",
+      "Bash(git -C /Users/narenkatakam/personal-ventures/experiments/fx-export log --oneline --all)",
+      "Bash(git -C /Users/narenkatakam/personal-ventures/experiments/fx-export remote -v)",
+      "Bash(wc -l /Users/narenkatakam/personal-ventures/experiments/fx-export/src/shaders/*.frag)",
+      "Bash(git -C /Users/narenkatakam/personal-ventures/experiments/fx-export log --oneline -1 --format=\"%B\")",
+      "Bash(gh repo view narenkatakam/fx-export --json homepageUrl,url)",
+      "Bash(gh repo edit narenkatakam/fx-export --homepage \"https://narenkatakam.github.io/fx-export/\")"
+    ]
+  }
+}
